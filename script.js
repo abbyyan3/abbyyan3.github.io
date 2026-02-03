@@ -1,3 +1,10 @@
+
+let highestRainfall = 0;
+let rainCity = "—";
+
+let highestRisk = 0;
+let riskCity = "—";
+
 // Create the map centered on Georgia
 var map = L.map('map').setView([32.7, -83.3], 7);
 
@@ -6,58 +13,27 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© OpenStreetMap contributors'
 }).addTo(map);
 
+// Get live rainfall data from Open-Meteo
+async function getRainfall(lat, lon) {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=precipitation&forecast_days=1`;
+  const response = await fetch(url);
+  const data = await response.json();
 
-// Flood risk data (with alert threshold)
+  // Get the most recent hourly rainfall value
+  return data.hourly.precipitation[0];
+}
+
+
+// Flood risk data
 var floodRiskAreas = [
-  {
-    name: "Savannah",
-    coords: [32.0809, -81.0912],
-    risk: 45,
-    reason: "Coastal flooding & storm surge",
-    status: "⚠️ SEVERE FLOOD RISK"
-  },
-  {
-    name: "Brunswick",
-    coords: [31.1499, -81.4915],
-    risk: 40,
-    reason: "Tidal & coastal flooding",
-    status: "⚠️ HIGH FLOOD RISK"
-  },
-  {
-    name: "Albany",
-    coords: [31.5785, -84.1557],
-    risk: 35,
-    reason: "Flint River overflow",
-    status: "🟠 MODERATE FLOOD RISK"
-  },
-  {
-    name: "Macon",
-    coords: [32.8407, -83.6324],
-    risk: 30,
-    reason: "Ocmulgee River floodplain",
-    status: "🟡 ELEVATED FLOOD RISK"
-  },
-  {
-    name: "Columbus",
-    coords: [32.4609, -84.9877],
-    risk: 28,
-    reason: "Chattahoochee River flooding",
-    status: "🟡 ELEVATED FLOOD RISK"
-  },
-  {
-    name: "Atlanta",
-    coords: [33.7490, -84.3880],
-    risk: 22,
-    reason: "Urban flooding & river floodplains",
-    status: "🟢 LOW–MODERATE FLOOD RISK"
-  }
+  { name: "Savannah", coords: [32.0809, -81.0912], risk: 45, reason: "Coastal flooding" },
+  { name: "Brunswick", coords: [31.1499, -81.4915], risk: 40, reason: "Tidal flooding" },
+  { name: "Albany", coords: [31.5785, -84.1557], risk: 35, reason: "Flint River flooding" },
+  { name: "Macon", coords: [32.8407, -83.6324], risk: 30, reason: "Ocmulgee River floodplain" },
+  { name: "Columbus", coords: [32.4609, -84.9877], risk: 28, reason: "Chattahoochee River flooding" },
+  { name: "Atlanta", coords: [33.7490, -84.3880], risk: 22, reason: "Urban flooding" }
 ];
 
-// Alert threshold
-var ALERT_THRESHOLD = 40;
-
-// Track if alert already shown
-var alertShown = false;
 
 // Marker color based on risk
 function getColor(risk) {
@@ -67,34 +43,35 @@ function getColor(risk) {
   return "green";
 }
 
+floodRiskAreas.forEach(async area => {
 
-// Add markers and alerts
-floodRiskAreas.forEach(area => {
+  const rainfall = await getRainfall(area.coords[0], area.coords[1]);
 
-  // Create popup content
-  var popupContent = `
-    <b>${area.name}</b><br>
-    ${area.status}<br><br>
-    🌊 <b>Flood Cause:</b> ${area.reason}<br>
-    📊 <b>Estimated Flood Risk:</b> ${area.risk}%<br><br>
-    🚨 <i>Stay alert and follow local emergency guidance.</i>
-  `;
-
-
-  // Trigger alert for high flood risk
-  if (area.risk >= ALERT_THRESHOLD && !alertShown) {
-    alert(
-      "🚨 FLOOD ALERT 🚨\n\n" +
-      area.name + " is experiencing HIGH flood risk (" +
-      area.risk + "%).\n\n" +
-      "Please stay alert and monitor local emergency updates."
-    );
-    alertShown = true;
+  // Track highest rainfall
+  if (rainfall > highestRainfall) {
+    highestRainfall = rainfall;
+    rainCity = area.name;
   }
-});
 
-// Add circle markers
-floodRiskAreas.forEach(area => {
+  // Track highest flood risk
+  if (area.risk > highestRisk) {
+    highestRisk = area.risk;
+    riskCity = area.name;
+  }
+
+  // Update dashboard
+  document.getElementById("maxRain").textContent =
+    `${rainCity} (${highestRainfall} mm)`;
+
+  document.getElementById("maxRisk").textContent =
+    `${riskCity} (${highestRisk}%)`;
+
+// Trigger alert for high flood risk
+if (rainfall >= 15) {
+  alert(`🚨 FLOOD ALERT 🚨\n\nHeavy rainfall detected in ${area.name}.\nRainfall: ${rainfall} mm`);
+}
+
+  // Add marker
   L.circleMarker(area.coords, {
     radius: 10,
     fillColor: getColor(area.risk),
@@ -103,12 +80,14 @@ floodRiskAreas.forEach(area => {
     fillOpacity: 0.8
   })
   .addTo(map)
-  .bindPopup(
-    `<b>${area.name}</b><br>
-     🌊 ${area.reason}<br>
-     📊 Risk Level: <b>${area.risk}%</b>`
-  );
+  .bindPopup(`
+    <b>${area.name}</b><br><br>
+    🌧️ <b>Live Rainfall:</b> ${rainfall} mm<br>
+    🌊 <b>Flood Risk:</b> ${area.risk}%
+  `);
+
 });
+
 
 // Add legend
 var legend = L.control({ position: "bottomright" });
@@ -124,4 +103,5 @@ legend.onAdd = function () {
 };
 
 legend.addTo(map);
+
 
