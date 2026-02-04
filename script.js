@@ -104,4 +104,32 @@ legend.onAdd = function () {
 
 legend.addTo(map);
 
+function subscribeSMS() {
+  const phone = document.getElementById("phone").value;
+
+  if (!phone.startsWith("+")) {
+    alert("Use international format: +1XXXXXXXXXX");
+    return;
+  }
+
+  db.collection("smsSubscribers").add({
+    phone: phone,
+    time: new Date()
+  });
+
+  document.getElementById("smsStatus").textContent =
+    "✅ You will receive flood alerts by text.";
+}
+
+
+if (rainfall >= 0) {
+  db.collection("alerts").add({
+    city: area.name,
+    rain: rainfall,
+    time: new Date()
+  });
+}
+
+
+
 
